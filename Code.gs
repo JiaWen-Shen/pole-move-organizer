@@ -22,9 +22,9 @@ function parseCompact(str) {
   return entries.filter(e => e.length > 0);
 }
 
-function sortSelectedCell() {
-  const cell = SpreadsheetApp.getActiveRange();
+function sortCell(cell) {
   const raw = cell.getValue().toString().trim();
+  if (!raw) return null;
 
   // 判斷格式：有逗號 → 格式A，否則 → 格式B（緊湊）
   let entries;
@@ -48,14 +48,34 @@ function sortSelectedCell() {
 
   cell.setValue(sorted.join(', '));
 
-  const sortedCount = sorted.length;
-  if (originalCount !== sortedCount) {
-    SpreadsheetApp.getUi().alert(
-      `⚠️ 數量不一致！\n輸入：${originalCount} 個\n輸出：${sortedCount} 個\n請檢查。`
-    );
+  return { originalCount, sortedCount: sorted.length };
+}
+
+function sortSelectedCell() {
+  const range = SpreadsheetApp.getActiveRange();
+  const numRows = range.getNumRows();
+  const numCols = range.getNumColumns();
+
+  let processed = 0;
+  const warnings = [];
+
+  for (let row = 1; row <= numRows; row++) {
+    for (let col = 1; col <= numCols; col++) {
+      const cell = range.getCell(row, col);
+      const result = sortCell(cell);
+      if (!result) continue;
+
+      processed++;
+      if (result.originalCount !== result.sortedCount) {
+        const addr = cell.getA1Notation();
+        warnings.push(`${addr}：輸入 ${result.originalCount} 個，輸出 ${result.sortedCount} 個`);
+      }
+    }
+  }
+
+  if (warnings.length > 0) {
+    SpreadsheetApp.getUi().alert(`⚠️ 數量不一致：\n${warnings.join('\n')}`);
   } else {
-    SpreadsheetApp.getUi().alert(
-      `✓ 排序完成\n共 ${sortedCount} 個，數量一致。`
-    );
+    SpreadsheetApp.getUi().alert(`✓ 排序完成，共處理 ${processed} 格，數量皆一致。`);
   }
 }
